@@ -1,0 +1,3 @@
+timestamp,activity,duration,source_bytes,destination_bytes,failed_logins,connection_count,port_risk,predicted_label,status,severity,alert
+2026-10-11T17:03:53,Normal Activity Simulation,120,2000,3000,0,10,0,0,NORMAL,INFO,No alert generated
+2026-10-11T17:03:53,Suspicious Activity Simulation,50,95000,8000,8,90,1,1,THREAT DETECTED,HIGH,Investigate suspicious activity

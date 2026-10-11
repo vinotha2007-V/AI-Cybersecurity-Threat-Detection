@@ -1,0 +1,381 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Cybersecurity Threat Detection Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 25px;
+            font-family: Arial, sans-serif;
+            background: #0b1120;
+            color: #e2e8f0;
+        }
+
+        header {
+            margin-bottom: 28px;
+        }
+
+        header h1 {
+            color: #38bdf8;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: #94a3b8;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+
+        .card, .panel {
+            background: #172033;
+            border: 1px solid #29364d;
+            border-radius: 14px;
+            padding: 20px;
+        }
+
+        .card h3 {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-top: 0;
+        }
+
+        .number {
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        .blue { color: #38bdf8; }
+        .green { color: #4ade80; }
+        .red { color: #fb7185; }
+        .purple { color: #a5b4fc; }
+
+        .charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .panel h2 {
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            height: 280px;
+            position: relative;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 13px;
+            text-align: left;
+            border-bottom: 1px solid #29364d;
+            white-space: nowrap;
+        }
+
+        th {
+            color: #38bdf8;
+        }
+
+        tbody tr:hover {
+            background: #202d43;
+        }
+
+        footer {
+            text-align: center;
+            color: #64748b;
+            margin-top: 30px;
+        }
+
+        .error-message {
+            color: #fb7185;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 14px;
+            }
+
+            .charts {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>AI-Powered Cybersecurity Threat Detection</h1>
+    <p>Machine Learning Security Monitoring Dashboard</p>
+</header>
+
+<section class="cards">
+    <div class="card">
+        <h3>Total Dataset Records</h3>
+        <div class="number blue">{{ total_records }}</div>
+    </div>
+
+    <div class="card">
+        <h3>Normal Records</h3>
+        <div class="number green">{{ normal_count }}</div>
+    </div>
+
+    <div class="card">
+        <h3>Threat Records</h3>
+        <div class="number red">{{ threat_count }}</div>
+    </div>
+
+    <div class="card">
+        <h3>Model Accuracy</h3>
+        <div class="number purple">
+            {{ "%.1f"|format(metrics["accuracy"] * 100) }}%
+        </div>
+    </div>
+</section>
+
+<section class="charts">
+    <div class="panel">
+        <h2>Dataset Distribution</h2>
+        <div class="chart-container">
+            <canvas id="distributionChart"></canvas>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Model Evaluation</h2>
+        <div class="chart-container">
+            <canvas id="metricsChart"></canvas>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Feature Importance</h2>
+        <div class="chart-container">
+            <canvas id="featureChart"></canvas>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Threat Detection Results</h2>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    {% if latest_alerts %}
+                        {% for key in latest_alerts[0].keys() %}
+                            <th>{{ key.replace("_", " ")|title }}</th>
+                        {% endfor %}
+                    {% else %}
+                        <th>Status</th>
+                    {% endif %}
+                </tr>
+            </thead>
+
+            <tbody>
+                {% if latest_alerts %}
+                    {% for alert in latest_alerts %}
+                        <tr>
+                            {% for value in alert.values() %}
+                                <td>{{ value }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td>No detection results available.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<p id="chartError" class="error-message"></p>
+
+<footer>
+    AI Cybersecurity Threat Detection System | Educational Project
+</footer>
+
+<div
+    id="dashboardData"
+    data-normal="{{ normal_count }}"
+    data-threat="{{ threat_count }}"
+    data-accuracy="{{ metrics['accuracy'] }}"
+    data-precision="{{ metrics['precision'] }}"
+    data-recall="{{ metrics['recall'] }}"
+    data-f1="{{ metrics['f1_score'] }}"
+    data-features='{{ feature_importance|tojson }}'
+    hidden>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    function showError(message) {
+        document.getElementById("chartError").textContent = message;
+        console.error(message);
+    }
+
+    function startDashboard() {
+        if (typeof Chart === "undefined") {
+            showError(
+                "Charts could not load. Check your internet connection and refresh the page."
+            );
+            return;
+        }
+
+        const element = document.getElementById("dashboardData");
+
+        if (!element) {
+            showError("Dashboard data element was not found.");
+            return;
+        }
+
+        try {
+            const normalCount = Number(element.dataset.normal);
+            const threatCount = Number(element.dataset.threat);
+
+            const accuracy = Number(element.dataset.accuracy);
+            const precision = Number(element.dataset.precision);
+            const recall = Number(element.dataset.recall);
+            const f1Score = Number(element.dataset.f1);
+
+            const features = JSON.parse(element.dataset.features);
+
+            const featureLabels = features.map(function (item) {
+                return item.feature;
+            });
+
+            const featureValues = features.map(function (item) {
+                return Number(item.importance);
+            });
+
+            new Chart(
+                document.getElementById("distributionChart"),
+                {
+                    type: "doughnut",
+                    data: {
+                        labels: ["Normal", "Threat"],
+                        datasets: [{
+                            data: [normalCount, threatCount],
+                            backgroundColor: ["#4ade80", "#fb7185"],
+                            borderColor: "#172033",
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                }
+            );
+
+            new Chart(
+                document.getElementById("metricsChart"),
+                {
+                    type: "bar",
+                    data: {
+                        labels: [
+                            "Accuracy",
+                            "Precision",
+                            "Recall",
+                            "F1 Score"
+                        ],
+                        datasets: [{
+                            label: "Model Score",
+                            data: [
+                                accuracy,
+                                precision,
+                                recall,
+                                f1Score
+                            ],
+                            backgroundColor: [
+                                "#38bdf8",
+                                "#4ade80",
+                                "#fbbf24",
+                                "#818cf8"
+                            ],
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1
+                            }
+                        }
+                    }
+                }
+            );
+
+            new Chart(
+                document.getElementById("featureChart"),
+                {
+                    type: "bar",
+                    data: {
+                        labels: featureLabels,
+                        datasets: [{
+                            label: "Feature Importance",
+                            data: featureValues,
+                            backgroundColor: "#818cf8",
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        indexAxis: "y",
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                }
+            );
+
+        } catch (error) {
+            showError("Chart error: " + error.message);
+        }
+    }
+
+    startDashboard();
+})();
+</script>
+
+</body>
+</html>
+```
